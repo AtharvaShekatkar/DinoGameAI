@@ -1,8 +1,6 @@
 import pygame
 import os
-from pygame import image
-
-from pygame.key import get_repeat
+import random
 
 pygame.init()
 
@@ -17,7 +15,7 @@ RUNNING = [pygame.image.load(os.path.join("Assets/Dino", "DinoRun1.png")), pygam
 
 DUCKING = [pygame.image.load(os.path.join("Assets/Dino", "DinoDuck1.png")), pygame.image.load(os.path.join("Assets/Dino", "DinoDuck2.png"))]
 
-JUMPING = [pygame.image.load(os.path.join("Assets/Dino", "DinoJump.png"))]
+JUMPING = pygame.image.load(os.path.join("Assets/Dino", "DinoJump.png"))
 
 SMALL_CACTUS = [pygame.image.load(os.path.join("Assets/Cactus", "SmallCactus1.png")), 
                 pygame.image.load(os.path.join("Assets/Cactus", "SmallCactus2.png")), 
@@ -34,11 +32,18 @@ CLOUD = pygame.image.load(os.path.join("Assets/Other", "Cloud.png"))
 
 BACKGROUND = pygame.image.load(os.path.join("Assets/Other", "Track.png"))
 
+#Global Variables
+game_speed = 0
+x_pos_bg = 0
+y_pos_bg = 0
+points = 0
+
 
 class Dinosaur:
     X_POS = 80
     Y_POS = 310
     Y_DUCK_POS = 340
+    JUMP_VEL = 8.5
 
     def __init__(self) -> None:
         self.duck_img = DUCKING
@@ -51,6 +56,7 @@ class Dinosaur:
         self.dino_jump = False
 
         self.step_index = 0
+        self.jump_vel = self.JUMP_VEL
         self.image = self.run_img[0]
         self.dino_rect = self.image.get_rect()
 
@@ -66,7 +72,7 @@ class Dinosaur:
         if self.dino_run:
             self.run()
 
-        if self.step_index >= 10:
+        if self.step_index >= 20:
             self.step_index = 0
 
         if userInput[pygame.K_UP] and not self.dino_jump:
@@ -86,32 +92,93 @@ class Dinosaur:
 
 
     def duck(self):
-        self.image = self.duck_img[self.step_index // 5]
+        self.image = self.duck_img[self.step_index // 10]
         self.dino_rect = self.image.get_rect()
         self.dino_rect.x = self.X_POS
         self.dino_rect.y = self.Y_DUCK_POS
         self.step_index += 1
 
     def run(self):
-        self.image = self.run_img[self.step_index // 5]
+        self.image = self.run_img[self.step_index // 10]
         self.dino_rect = self.image.get_rect()
         self.dino_rect.x = self.X_POS
         self.dino_rect.y = self.Y_POS
         self.step_index += 1
 
     def jump(self):
-        pass
+        self.image = self.jump_img
+        if self.dino_jump:
+            self.dino_rect.y -= self.jump_vel * 3
+            self.jump_vel -= 0.6
+        
+        if self.jump_vel < -self.JUMP_VEL:
+            self.dino_jump = False
+            self.dino_run = True
+            self.jump_vel = self.JUMP_VEL
 
 
     def draw(self, SCREEN):
         SCREEN.blit(self.image, (self.dino_rect.x, self.dino_rect.y))
+
+
+class Cloud:
+    def __init__(self) -> None:
+        self.x = SCREEN_WIDTH + random.randint(800, 1000)
+        self.y = random.randint(50, 100)
+        self.image = CLOUD
+        self.width = self.image.get_width()
+
+    def update(self):
+        self.x -= game_speed
+        if self.x < -self.width:
+            self.x = SCREEN_WIDTH + random.randint(800, 1000)
+            self.y = random.randint(50, 100)
+
+    def draw(self, SCREEN):
+         SCREEN.blit(self.image, (self.x, self.y))
+
     
 
 def main():
+    global game_speed, x_pos_bg, y_pos_bg, points
+    
     run = True
     clock = pygame.time.Clock()
 
     player = Dinosaur()
+
+    cloud = Cloud()
+    
+    game_speed = 14
+    x_pos_bg = 0
+    y_pos_bg = 380
+    points = 0
+    font = pygame.font.Font('freesansbold.ttf', 20)
+
+
+    def update_score():
+        global points, game_speed
+        points += 1
+        if points % 100 == 0:
+            game_speed += 1
+        
+        text = font.render("Points: " + str(points), True, (0, 0, 0))
+        textRect = text.get_rect()
+        textRect.center = (1000, 40)
+        SCREEN.blit(text, textRect)
+
+
+    def update_background():
+        global x_pos_bg, y_pos_bg, game_speed
+        image_width = BACKGROUND.get_width()
+        SCREEN.blit(BACKGROUND, (x_pos_bg, y_pos_bg))
+        SCREEN.blit(BACKGROUND, (image_width + x_pos_bg, y_pos_bg))
+
+        if x_pos_bg <= -image_width:
+            SCREEN.blit(BACKGROUND, (image_width + x_pos_bg, y_pos_bg))
+            x_pos_bg = 0
+        
+        x_pos_bg -= game_speed
 
     while run:
         for event in pygame.event.get():
@@ -124,7 +191,14 @@ def main():
         player.draw(SCREEN)
         player.update(userInput)
 
-        clock.tick(30)
+        update_background()
+
+        cloud.draw(SCREEN)
+        cloud.update()
+
+        update_score()
+
+        clock.tick(60)
         pygame.display.update()
 
 main()
