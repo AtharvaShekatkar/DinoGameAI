@@ -38,6 +38,9 @@ x_pos_bg = 0
 y_pos_bg = 0
 points = 0
 
+obstacles = []
+
+dinosaurs = []
 
 class Dinosaur:
     X_POS = 80
@@ -137,15 +140,67 @@ class Cloud:
     def draw(self, SCREEN):
          SCREEN.blit(self.image, (self.x, self.y))
 
+
+class Obstacle:
+    def __init__(self, image, type) -> None:
+        self.image = image
+        self.type = type
+        self.rect = self.image[self.type].get_rect()
+        self.rect.x = SCREEN_WIDTH
+
+
+    def update(self):
+        self.rect.x -= game_speed
+        if self.rect.x < -self.rect.width:
+            obstacles.pop()
+
+
+    def draw(self, SCREEN):
+        SCREEN.blit(self.image[self.type], self.rect)
+
+
+class SmallCactus(Obstacle):
+    def __init__(self, image) -> None:
+        self.type = random.randint(0, 2)
+        super().__init__(image, self.type)
+        self.rect.y = 325
+
+
+
+class LargeCactus(Obstacle):
+    def __init__(self, image) -> None:
+        self.type = random.randint(0, 2)
+        super().__init__(image, self.type)
+        self.rect.y = 300
+
+
+
+class Bird(Obstacle):
+    def __init__(self, image) -> None:
+        self.type = 0
+        super().__init__(image, self.type)
+        self.rect.y = random.randint(120, 320)
+        self.index = 0
     
 
+    def draw(self, SCREEN):
+        if self.index >= 19:
+            self.index = 0
+        
+        SCREEN.blit(self.image[self.index // 10], self.rect)
+        self.index += 1
+
+
+def remove(index):
+    dinosaurs.pop(index)
+
 def main():
-    global game_speed, x_pos_bg, y_pos_bg, points
+    global game_speed, x_pos_bg, y_pos_bg, points, obstacles, dinosaurs
     
     run = True
     clock = pygame.time.Clock()
 
-    player = Dinosaur()
+    dinosaurs = [Dinosaur()]
 
     cloud = Cloud()
     
@@ -159,7 +214,7 @@ def main():
     def update_score():
         global points, game_speed
         points += 1
-        if points % 100 == 0:
+        if points % 200 == 0:
             game_speed += 1
         
         text = font.render("Points: " + str(points), True, (0, 0, 0))
@@ -188,8 +243,29 @@ def main():
         SCREEN.fill((255, 255, 255))
         userInput = pygame.key.get_pressed()
 
-        player.draw(SCREEN)
-        player.update(userInput)
+
+        if len(dinosaurs) == 0:
+            break
+
+        for dinosaur in dinosaurs:
+            dinosaur.draw(SCREEN)
+            dinosaur.update(userInput)
+
+        if len(obstacles) == 0:
+            temp = random.randint(0, 100)
+            if temp == 0:
+                obstacles.append(SmallCactus(SMALL_CACTUS))
+            elif temp == 1:
+                obstacles.append(LargeCactus(LARGE_CACTUS))
+            elif temp == 2:
+                obstacles.append(Bird(BIRD))
+
+        for obstacle in obstacles:
+            obstacle.draw(SCREEN)
+            obstacle.update()
+            for i, dinosaur in enumerate(dinosaurs):
+                if dinosaur.dino_rect.colliderect(obstacle.rect):
+                    remove(i)
 
         update_background()
 
