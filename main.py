@@ -2,14 +2,11 @@ import pygame
 import os
 import random
 
-pygame.init()
 
 #Global Constants
 
 SCREEN_HEIGHT = 600
 SCREEN_WIDTH = 1100
-
-SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
 RUNNING = [pygame.image.load(os.path.join("Assets/Dino", "DinoRun1.png")), pygame.image.load(os.path.join("Assets/Dino", "DinoRun2.png"))]
 
@@ -67,7 +64,7 @@ class Dinosaur:
         self.dino_rect.y = self.Y_POS
     
 
-    def update(self, userInput):
+    def update(self, move):
         if self.dino_duck:
             self.duck()
         if self.dino_jump:
@@ -78,17 +75,17 @@ class Dinosaur:
         if self.step_index >= 20:
             self.step_index = 0
 
-        if userInput[pygame.K_UP] and not self.dino_jump:
+        if move == 0 and not self.dino_jump:
             self.dino_jump = True
             self.dino_run = False
             self.dino_duck = False
 
-        elif userInput[pygame.K_DOWN] and not self.dino_jump:
+        elif move == 1 and not self.dino_jump:
             self.dino_duck = True
             self.dino_jump = False
             self.dino_run = False
         
-        elif not(self.dino_jump or userInput[pygame.K_DOWN]):
+        elif not(self.dino_jump or move == 1):
             self.dino_run = True
             self.dino_jump = False
             self.dino_duck = False
@@ -194,7 +191,10 @@ class Bird(Obstacle):
 def remove(index):
     dinosaurs.pop(index)
 
-def main():
+def game():
+    pygame.init()
+    SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    
     global game_speed, x_pos_bg, y_pos_bg, points, obstacles, dinosaurs
     
     run = True
@@ -241,15 +241,21 @@ def main():
                 run = False
 
         SCREEN.fill((255, 255, 255))
-        userInput = pygame.key.get_pressed()
+        # userInput = pygame.key.get_pressed()
 
+
+        moves = []
+        for dinosaur in dinosaurs:
+            moves.append(random.randint(0, 100))
 
         if len(dinosaurs) == 0:
+            pygame.quit()
+            obstacles.pop()
             break
 
-        for dinosaur in dinosaurs:
+        for i, dinosaur in enumerate(dinosaurs):
             dinosaur.draw(SCREEN)
-            dinosaur.update(userInput)
+            dinosaur.update(moves[i])
 
         if len(obstacles) == 0:
             temp = random.randint(0, 100)
@@ -277,4 +283,5 @@ def main():
         clock.tick(60)
         pygame.display.update()
 
-main()
+for i in range(3):
+    game()
