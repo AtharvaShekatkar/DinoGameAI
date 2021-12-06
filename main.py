@@ -1,8 +1,9 @@
 import pygame
 import os
 import random
-
-
+import numpy as np
+import sys
+import math
 #Global Constants
 
 SCREEN_HEIGHT = 600
@@ -30,6 +31,8 @@ CLOUD = pygame.image.load(os.path.join("Assets/Other", "Cloud.png"))
 BACKGROUND = pygame.image.load(os.path.join("Assets/Other", "Track.png"))
 
 #Global Variables
+# global game_speed, x_pos_bg, y_pos_bg, points, obstacles, dinosaurs, dinosaurs_copy
+
 game_speed = 0
 x_pos_bg = 0
 y_pos_bg = 0
@@ -39,7 +42,19 @@ obstacles = []
 
 dinosaurs = []
 
-class Dinosaur:
+dinosaurs_copy = []
+
+class NeuralNet:
+    def __init__(self) -> None:
+        self.Theta1 = (np.random.randn(3, 3) * 2 * 0.12 - 0.12)
+        self.Theta2 = (np.random.randn(3, 4) * 2 * 0.12 - 0.12)
+    
+    def display(self):
+        print(self.Theta1)
+        print(self.Theta2)
+
+
+class Dinosaur(NeuralNet):
     X_POS = 80
     Y_POS = 310
     Y_DUCK_POS = 340
@@ -62,6 +77,10 @@ class Dinosaur:
 
         self.dino_rect.x = self.X_POS
         self.dino_rect.y = self.Y_POS
+
+        self.score = 0
+
+        super().__init__()
     
 
     def update(self, move):
@@ -75,17 +94,17 @@ class Dinosaur:
         if self.step_index >= 20:
             self.step_index = 0
 
-        if move == 0 and not self.dino_jump:
+        if np.argmax(move) == 0 and not self.dino_jump:
             self.dino_jump = True
             self.dino_run = False
             self.dino_duck = False
 
-        elif move == 1 and not self.dino_jump:
+        elif np.argmax(move) == 1 and not self.dino_jump:
             self.dino_duck = True
             self.dino_jump = False
             self.dino_run = False
         
-        elif not(self.dino_jump or move == 1):
+        elif not(self.dino_jump or np.argmax(move) == 1):
             self.dino_run = True
             self.dino_jump = False
             self.dino_duck = False
@@ -195,13 +214,12 @@ def game():
     pygame.init()
     SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     
-    global game_speed, x_pos_bg, y_pos_bg, points, obstacles, dinosaurs
+    global game_speed, x_pos_bg, y_pos_bg, points, obstacles, dinosaurs, dinosaurs_copy
     
     run = True
     clock = pygame.time.Clock()
 
-    dinosaurs = [Dinosaur()]
-
+    dinosaurs_copy = dinosaurs.copy()
     cloud = Cloud()
     
     game_speed = 14
@@ -235,27 +253,39 @@ def game():
         
         x_pos_bg -= game_speed
 
+    def distance(pos_a, pos_b):
+        dx = pos_a[0] - pos_b[0]
+        dy = pos_a[1] - pos_b[1]
+        return math.sqrt(dx**2 + dy**2)
+
+
+    def get_output(inputs: np.matrix):
+        def sigmoid(x: np.matrix):
+            return(1 / (1 + np.exp(-x)))
+        a1 = inputs.transpose()
+        a1 = np.insert(a1, 0, 1, axis=0)
+        z2 = np.dot(dinosaur.Theta1, a1)
+        a2 = sigmoid(z2)
+        a2 = np.insert(a2, 0, 1, axis=0)
+        z3 = np.dot(dinosaur.Theta2, a2)
+        a3 = sigmoid(z3)
+        return a3
+
     while run:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                run = False
+                sys.exit()
 
         SCREEN.fill((255, 255, 255))
         # userInput = pygame.key.get_pressed()
 
-
         moves = []
-        for dinosaur in dinosaurs:
-            moves.append(random.randint(0, 100))
-
+        
         if len(dinosaurs) == 0:
             pygame.quit()
             obstacles.pop()
             break
 
-        for i, dinosaur in enumerate(dinosaurs):
-            dinosaur.draw(SCREEN)
-            dinosaur.update(moves[i])
 
         if len(obstacles) == 0:
             temp = random.randint(0, 100)
@@ -271,8 +301,20 @@ def game():
             obstacle.update()
             for i, dinosaur in enumerate(dinosaurs):
                 if dinosaur.dino_rect.colliderect(obstacle.rect):
+                    dinosaur.score = points
                     remove(i)
 
+        for dinosaur in dinosaurs:
+            if len(obstacles) == 0:
+                dist = distance((dinosaur.dino_rect.x, dinosaur.dino_rect.y), [10000, 310])
+            else:
+                dist = distance((dinosaur.dino_rect.x, dinosaur.dino_rect.y), obstacles[0].rect.midtop)
+            moves.append(get_output(np.matrix([dinosaur.dino_rect.y, dist], dtype=np.float64)))
+
+        for i, dinosaur in enumerate(dinosaurs):
+            dinosaur.draw(SCREEN)
+            dinosaur.update(moves[i])
+        
         update_background()
 
         cloud.draw(SCREEN)
@@ -283,5 +325,28 @@ def game():
         clock.tick(60)
         pygame.display.update()
 
-for i in range(3):
+
+def Dino_compare(dino_obj: Dinosaur):
+    return dino_obj.score
+
+def updateNet():
+    dinosaurs_copy.sort(key=Dino_compare, reverse=True)
+    limit = 7
+    for i in range(limit - 1):
+        for j in range(i + 1, limit):
+            temp_dino = Dinosaur()
+            for row in range(temp_dino.Theta1.shape[0]):
+                for col in range(temp_dino.Theta1.shape[1]):
+                    temp_dino.Theta1[row][col] = (dinosaurs_copy[i].Theta1[row][col] + dinosaurs_copy[j].Theta1[row][col]) / 2
+            
+            for row in range(temp_dino.Theta2.shape[0]):
+                for col in range(temp_dino.Theta2.shape[1]):
+                    temp_dino.Theta2[row][col] = (dinosaurs_copy[i].Theta2[row][col] + dinosaurs_copy[j].Theta2[row][col]) / 2
+            dinosaurs.append(temp_dino)      
+
+for iters in range(10):
+    if iters == 0:
+        for i in range(21):
+            dinosaurs.append(Dinosaur())
     game()
+    updateNet()
